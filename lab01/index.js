@@ -1,6 +1,7 @@
 // 1. SETUP EXPRESS
 const express = require('express');
 const cors = require("cors");
+const { ObjectId } = require("mongodb");
 
 require('dotenv').config();
 const MongoClient = require("mongodb").MongoClient;
@@ -22,7 +23,7 @@ async function connect(uri, dbname) {
 async function main() {
 
     let db = await connect(mongoUri, dbname);
-    const { ObjectId } = require("mongodb");
+    
 
     //route starts here
     //get details of customers
@@ -48,7 +49,7 @@ async function main() {
         }
     });
     //search engine
-    app.get("/restaurant", async function (reg, res) {
+    app.get("/restaurant", async function (req, res) {
         try{
         const { name, menu, customers, remarks, critques } = req.query;
         let query = {};
@@ -82,9 +83,10 @@ async function main() {
     });
     
     //create a new restaurant
-    app.post('/restaurant', async function(res,req){
+    app.post('/restaurant', async function(req,res){
         try{
-            const { name, menu, customers, remarks, critques } = req.query;
+            const { name, block_no, address, zipcode, customers, menu,  remarks, critques,  overall, recommendation } = req.body;
+
             if (!name || !menu || !customers || !remarks || !critques) {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
@@ -93,8 +95,8 @@ async function main() {
                 return res.status(400).json({ error: 'Invalid menu' });
             }
 
-            const customersDocs = await db.collection('customers').findOne({ name: { $in: customers } });
-            if (!customersDocs) {
+            const customersDocs = await db.collection('customers').findOne({ name: customers });
+            if (!customersDocs){
                 return res.status(400).json({ error: 'Invalid customer' });
             }
     
@@ -102,15 +104,16 @@ async function main() {
             if (critquesDocs.length !== critques.length) {
                 return res.status(400).json({ error: 'One or more invalid critques' });
             }
+            
             const newRestaurant = {
                 name,
                 block_no,
                 address,
                 zipcode,
-                customers: customersDocs.map(tag => ({
+                customers:{
                     _id: customers._id,
                     name: customers.name
-                })),
+                },
                 menu: {
                     _id: menuDoc._id,
                     name: menuDoc.name
@@ -118,9 +121,9 @@ async function main() {
                 overall,
                 recommendation,
                 remarks,
-                critques: critquesDocs.map(tag => ({
-                    _id: critques._id,
-                    name: critques.name
+                critques: critquesDocs.map(crit => ({
+                    _id: crit._id,
+                    name: crit.name
                 }))
             };
             // Insert the new recipe into the database
@@ -133,8 +136,8 @@ async function main() {
             });
         }catch(e){
             console.error('Error creating restaurant:', e);
-            //res.status(500).json({ e: 'Internal server error' });
-            res.sendStatus(500);
+            res.status(500).json({ e: 'Internal server error', details: e.message });
+           // res.sendStatus(500);
         }
     });
 
