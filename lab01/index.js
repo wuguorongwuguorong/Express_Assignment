@@ -73,19 +73,16 @@ async function main() {
     app.get("/search", async function (req, res) {
         try {
             const critques = req.query.critques;
-            const remarks = req.query.remarks;
             const menu = req.query.menu;
             
             let critera = {};
             
             if (critques) {
-                critera['critques'] = critques;
+                critera['critques.name'] = { $regex: critques, $options: 'i' };;
             }
-            if (remarks) {
-                critera['remarks'] = remarks;
-            }
+          
             if (menu) {
-                critera['menu'] = menu;
+                critera['menu.name'] = { $regex: menu, $options: 'i' };
             }
          
             console.log(critera)
