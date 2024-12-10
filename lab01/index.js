@@ -9,7 +9,7 @@ const dbname = "ABC_Restaurant"; // CHANGE THIS TO YOUR ACTUAL DATABASE NAME
 
 const mongoUri = process.env.MONGO_URI;
 const app = express();
-//const bcrypt = require('bcrypt');
+const bcrypt = require('bcrypt');
 
 app.use(express.json());
 app.use(cors());
@@ -21,7 +21,7 @@ async function connect(uri, dbname) {
     _db = client.db(dbname);
     return _db;
 }
-//const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 
 const generateAccessToken = (id, email) => {
     return jwt.sign({
@@ -48,7 +48,7 @@ async function main() {
 
     //route starts here
     //get details of restaurant
-    app.get("/restaurant", async (req, res) => {
+    app.get("/restaurant",verifyToken, async (req, res) => {
         try {
             const rest = await db.collection('restaurant').find().project({
                 name: 1,
@@ -70,36 +70,36 @@ async function main() {
         }
     });
     //search engine
-    app.get("/restaurant", async function (req, res) {
+    app.get("/search", async function (req, res) {
         try {
-            const { name, menu, customers, remarks, critques } = req.query;
-            let query = {};
+            const critques = req.query.critques;
+            const remarks = req.query.remarks;
+            const menu = req.query.menu;
+            
+            let critera = {};
             
             if (critques) {
-                query['critques.name'] = { $in: critques.split(',') };
+                critera['critques'] = critques;
             }
             if (remarks) {
-                query['remarks.name'] = { $all: remarks.split(',').map(i => new RegExp(i, 'i')) };
+                critera['remarks'] = remarks;
             }
             if (menu) {
-                query['menu.name'] = { $regex: menu, $options: 'i' };
+                critera['menu'] = menu;
             }
-            if (customers) {
-                query['customers.name'] = { $in: customers.split(',') };
-            }
-            if (name) {
-                query.name = { $regex: name, $options: 'i' };
-            }
-            console.log(query)
-            console.log(req.query)
-            const restaurant = await db.collection('restaurant').find(query).project({
-                name: 1,
-                'menu.name': 1,
-                'critques.name': 1,
-                _id: 0
+         
+            console.log(critera)
+            
+            const result = await db.collection('restaurant').find(critera).project({
+                'name':1,
+                'menu': 1,
+                'remarks': 1,
+                'critques': 1
             }).toArray();
-
-            res.json({ restaurant });
+            console.log(result)
+            res.json({ 
+                result
+             });
         } catch (error) {
             console.error('Error searching restaurant:', error);
             res.status(500).json({ error: 'Internal server error' });
@@ -119,7 +119,9 @@ async function main() {
                 return res.status(400).json({ error: 'Invalid menu' });
             }
 
-            const customersDocs = await db.collection('customers').findOne({ name: customers });
+            const customersDocs = await db.collection('customers').findOne({
+                name: new RegExp(customers, 'i')
+            });
             if (!customersDocs) {
                 return res.status(400).json({ error: 'Invalid customer' });
             }
@@ -135,8 +137,8 @@ async function main() {
                 address,
                 zipcode,
                 customers: {
-                    _id: customers._id,
-                    name: customers.name
+                    _id: customersDocs._id,
+                    name: customersDocs.name
                 },
                 menu: {
                     _id: menuDoc._id,
@@ -169,12 +171,12 @@ async function main() {
         try {
             const restaurantId = req.params.id;
             const result = await db.collection('restaurant').deleteOne({ _id: new ObjectId(restaurantId) });
-            res.json(400)({
+            res.status(201).json({
+                message: 'Restaurant deleted successfully',
                 result
             })
         } catch (e) {
-            res.status(500).json({ e: 'Internal server error' });
-            res.sendStatus(500);
+            res.status(500).json({ e: 'Internal server error',details: e.message });
         }
     })
 
@@ -236,7 +238,7 @@ async function main() {
                 return res.status(404).json({ error: 'Restaurant or Overview not found' });
             }
     
-            res.json({
+            res.status(201).json({
                 message: 'overview updated successfully',
                 result
             });
@@ -251,7 +253,7 @@ async function main() {
             'email': req.body.email,
             'password': await bcrypt.hash(req.body.password, 12)
         })
-        res.json({
+        res.status(201).json({
             "message": "New user account",
             "result": result
         })
