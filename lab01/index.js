@@ -154,7 +154,74 @@ async function main() {
             res.sendStatus(500);
         }
     })
+
+    //insert within the collection starts here
+    app.post('/restaurant/:id/overview', async function (req, res) {
+        try {
+            const restid = req.params.id;
+            const { cost, time, date } = req.body;
+
+            if (!cost || !time || !date) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const newOverview = { overviewId: new ObjectId(), cost: Number(cost), time, date: new Date() };
+            const result = await db.collection('restaurant').updateOne({_id: new ObjectId(restid) }, { $push: { overview: newOverview } });
+
+            if (result.matchedCount === 0) {
+                return res.status(404).json({ error: 'restaurant not found' });
+            }
+            res.status(201).json({
+                message: 'Restaurant updated successfully',
+                result
+            })
+        } catch (e) {
+            console.error('Error creating overview:', e);
+            res.status(500).json({ e: 'Internal server error' });
+        }
+    });
+
+    //update within the collection starts here
+    app.put('/restaurant/:restaurantId/overview/:overviewId', async function(req, res) {
+        try {
+            const restaurantId = req.params.restaurantId;
+            const overviewId = req.params.overviewId;
+            const { cost, time, date } = req.body;
     
+            //validation
+            if (!cost || !time || !date) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const updatedOverview = {
+                overview_id: new ObjectId(overviewId),
+                cost: Number(cost),
+                time,
+                date: new Date()  // Update the date to reflect the edit time
+            };
+            const result = await db.collection('restaurant').updateOne(
+                { 
+                    _id: new ObjectId(restaurantId),
+                    "overview.overviewId": new ObjectId(overviewId)
+                },
+                { 
+                    $set: { "overview.$": updatedOverview }
+                }
+            );
+    
+            if (result.matchedCount === 0) {
+                return res.status(404).json({ error: 'Restaurant or Overview not found' });
+            }
+    
+            res.json({
+                message: 'overview updated successfully',
+                result
+            });
+        } catch (error) {
+            console.error('Error updating overview:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
 }
 main();
 app.listen(3000, () => {
