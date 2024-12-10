@@ -47,7 +47,7 @@ async function main() {
 
 
     //route starts here
-    //get details of customers
+    //get details of restaurant
     app.get("/restaurant", async (req, res) => {
         try {
             const rest = await db.collection('restaurant').find().project({
@@ -150,10 +150,9 @@ async function main() {
                     name: crit.name
                 }))
             };
-            // Insert the new recipe into the database
+            // Insert the new restaurant into the database
             const rest = await db.collection('restaurant').insertOne(newRestaurant);
-            console.log("rest >>> ", newRestaurant);
-            // Send back the created recipe
+           
             res.status(201).json({
                 message: 'Restaurant created successfully',
                 restaurantId: rest.insertedId
@@ -161,7 +160,7 @@ async function main() {
         } catch (e) {
             console.error('Error creating restaurant:', e);
             res.status(500).json({ e: 'Internal server error', details: e.message });
-            // res.sendStatus(500);
+        
         }
     });
 
@@ -174,7 +173,7 @@ async function main() {
                 result
             })
         } catch (e) {
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ e: 'Internal server error' });
             res.sendStatus(500);
         }
     })
