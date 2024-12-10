@@ -23,7 +23,7 @@ async function connect(uri, dbname) {
 async function main() {
 
     let db = await connect(mongoUri, dbname);
-    
+
 
     //route starts here
     //get details of customers
@@ -50,42 +50,42 @@ async function main() {
     });
     //search engine
     app.get("/restaurant", async function (req, res) {
-        try{
-        const { name, menu, customers, remarks, critques } = req.query;
-        let query = {};
-        if (crtiques) {
-            query['critques.name'] = { $in: critques.split(',') };
-        }
-        if (remarks) {
-            query['remarks.name'] = { $all: remarks.split(',').map(i => new RegExp(i, 'i')) };
-        }
-        if (menu) {
-            query['menu.name'] = { $regex: menu, $options: 'i' };
-        }
-        if (customers) {
-            query['customers.name'] = { $in: customers.split(',') };
-        }
-        if (name) {
-            query.name = { $regex: name, $options: 'i' };
-        }
-        const restaurant = await db.collection('restaurant').find(query).project({
-            name: 1,
-            'menu.name': 1,
-            'critques.name': 1,
-            _id: 0
-        }).toArray();
+        try {
+            const { name, menu, customers, remarks, critques } = req.query;
+            let query = {};
+            if (crtiques) {
+                query['critques.name'] = { $in: critques.split(',') };
+            }
+            if (remarks) {
+                query['remarks.name'] = { $all: remarks.split(',').map(i => new RegExp(i, 'i')) };
+            }
+            if (menu) {
+                query['menu.name'] = { $regex: menu, $options: 'i' };
+            }
+            if (customers) {
+                query['customers.name'] = { $in: customers.split(',') };
+            }
+            if (name) {
+                query.name = { $regex: name, $options: 'i' };
+            }
+            const restaurant = await db.collection('restaurant').find(query).project({
+                name: 1,
+                'menu.name': 1,
+                'critques.name': 1,
+                _id: 0
+            }).toArray();
 
-        res.json({ restaurant });
-    } catch (error) {
-        console.error('Error searching restaurant:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+            res.json({ restaurant });
+        } catch (error) {
+            console.error('Error searching restaurant:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
     });
-    
+
     //create a new restaurant
-    app.post('/restaurant', async function(req,res){
-        try{
-            const { name, block_no, address, zipcode, customers, menu,  remarks, critques,  overall, recommendation } = req.body;
+    app.post('/restaurant', async function (req, res) {
+        try {
+            const { name, block_no, address, zipcode, customers, menu, remarks, critques, overall, recommendation } = req.body;
 
             if (!name || !menu || !customers || !remarks || !critques) {
                 return res.status(400).json({ error: 'Missing required fields' });
@@ -96,21 +96,21 @@ async function main() {
             }
 
             const customersDocs = await db.collection('customers').findOne({ name: customers });
-            if (!customersDocs){
+            if (!customersDocs) {
                 return res.status(400).json({ error: 'Invalid customer' });
             }
-    
+
             const critquesDocs = await db.collection('critques').find({ name: { $in: critques } }).toArray();
             if (critquesDocs.length !== critques.length) {
                 return res.status(400).json({ error: 'One or more invalid critques' });
             }
-            
+
             const newRestaurant = {
                 name,
                 block_no,
                 address,
                 zipcode,
-                customers:{
+                customers: {
                     _id: customers._id,
                     name: customers.name
                 },
@@ -134,15 +134,28 @@ async function main() {
                 message: 'Restaurant created successfully',
                 restaurantId: rest.insertedId
             });
-        }catch(e){
+        } catch (e) {
             console.error('Error creating restaurant:', e);
             res.status(500).json({ e: 'Internal server error', details: e.message });
-           // res.sendStatus(500);
+            // res.sendStatus(500);
         }
     });
 
+    //delete starts here
+    app.delete('/restaurant/:id', async function (req, res) {
+        try {
+            const restaurantId = req.params.id;
+            const result = await db.collection('restaurant').deleteOne({ _id: new ObjectId(restaurantId) });
+            res.json(400)({
+                result
+            })
+        } catch (e) {
+            res.status(500).json({ error: 'Internal server error' });
+            res.sendStatus(500);
+        }
+    })
+    
 }
-
 main();
 app.listen(3000, () => {
     console.log("Server started")
