@@ -9,6 +9,7 @@ const dbname = "ABC_Restaurant"; // CHANGE THIS TO YOUR ACTUAL DATABASE NAME
 
 const mongoUri = process.env.MONGO_URI;
 const app = express();
+//const bcrypt = require('bcrypt');
 
 app.use(express.json());
 app.use(cors());
@@ -19,6 +20,26 @@ async function connect(uri, dbname) {
     })
     _db = client.db(dbname);
     return _db;
+}
+//const jwt = require('jsonwebtoken');
+
+const generateAccessToken = (id, email) => {
+    return jwt.sign({
+        'user_id': id,
+        'email': email
+    }, process.env.TOKEN_SECRET, {
+        expiresIn: "1h"
+    });
+}
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.sendStatus(403);
+    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
 }
 async function main() {
 
@@ -53,7 +74,8 @@ async function main() {
         try {
             const { name, menu, customers, remarks, critques } = req.query;
             let query = {};
-            if (crtiques) {
+            
+            if (critques) {
                 query['critques.name'] = { $in: critques.split(',') };
             }
             if (remarks) {
@@ -68,6 +90,8 @@ async function main() {
             if (name) {
                 query.name = { $regex: name, $options: 'i' };
             }
+            console.log(query)
+            console.log(req.query)
             const restaurant = await db.collection('restaurant').find(query).project({
                 name: 1,
                 'menu.name': 1,
@@ -222,7 +246,42 @@ async function main() {
             res.status(500).json({ error: 'Internal server error' });
         }
     });
+    app.post('/users', async function (req, res) {
+        console.log("req.body >>> ", req.body);
+        const result = await db.collection("users").insertOne({
+            'email': req.body.email,
+            'password': await bcrypt.hash(req.body.password, 12)
+        })
+        res.json({
+            "message": "New user account",
+            "result": result
+        })
+    })
+    app.post('/login', async (req, res) => {
+        try {
+            console.log("body >>> ", req.body);
+            const { email, password } = req.body;
+            if (!email || !password) {
+                return res.status(400).json({ message: 'Email and password are required' });
+            }
+            const user = await db.collection('users').findOne({ email: email });
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+            if (!isPasswordValid) {
+                return res.status(401).json({ message: 'Invalid password' });
+            }
+            const accessToken = generateAccessToken(user._id, user.email);
+            res.json({ accessToken: accessToken });
+        } catch (e) {
+            console.log(e);
+            res.sendStatus(500);
+        }
+
+    });
 }
+
 main();
 app.listen(3000, () => {
     console.log("Server started")
